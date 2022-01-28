@@ -27,14 +27,14 @@ import java.util.Collections;
 @Configuration
 public class ReactiveKafkaConsumerConfig {
     @Bean
-    public ReceiverOptions<String, FakeConsumerDTO> kafkaReceiverOptions(@Value(value = "${FAKE_CONSUMER_DTO_TOPIC}") String topic, KafkaProperties kafkaProperties) {
-        ReceiverOptions<String, FakeConsumerDTO> basicReceiverOptions = ReceiverOptions.create(kafkaProperties.buildConsumerProperties());
+    public ReceiverOptions<String, FakeProducerDTO> kafkaReceiverOptions(@Value(value = "${FAKE_CONSUMER_DTO_TOPIC}") String topic, KafkaProperties kafkaProperties) {
+        ReceiverOptions<String, FakeProducerDTO> basicReceiverOptions = ReceiverOptions.create(kafkaProperties.buildConsumerProperties());
         return basicReceiverOptions.subscription(Collections.singletonList(topic));
     }
 
     @Bean
-    public ReactiveKafkaConsumerTemplate<String, FakeConsumerDTO> reactiveKafkaConsumerTemplate(ReceiverOptions<String, FakeConsumerDTO> kafkaReceiverOptions) {
-        return new ReactiveKafkaConsumerTemplate<String, FakeConsumerDTO>(kafkaReceiverOptions);
+    public ReactiveKafkaConsumerTemplate<String, FakeProducerDTO> reactiveKafkaConsumerTemplate(ReceiverOptions<String, FakeProducerDTO> kafkaReceiverOptions) {
+        return new ReactiveKafkaConsumerTemplate<String, FakeProducerDTO>(kafkaReceiverOptions);
     }
 }
 ```
@@ -63,23 +63,25 @@ public class ReactiveKafkaProducerConfig {
 ```
 
 ```properties
-spring.kafka.bootstrap-servers=localhost:9200
+# your ip for kafka server
+spring.kafka.bootstrap-servers=10.8.0.1:9092
 # producer
 spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
-spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonDeserializer
+spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer
 # consumer
 spring.kafka.consumer.group-id=reactivekafkaconsumerandproducer
 
 spring.kafka.consumer.auto-offset-reset=earliest
 spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
 spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
+spring.kafka.consumer.properties.spring.json.trusted.packages=*
 # json deserializer config
 spring.kafka.properties.spring.json.trusted.packages=*
 spring.kafka.consumer.properties.spring.json.use.type.headers=false
-spring.kafka.consumer.properties.spring.json.value.default.type=com.example.reactivekafkaconsumerandproducer.dto.FakeConsumerDTO
+spring.kafka.consumer.properties.spring.json.value.default.type=com.example.reactivekafkaconsumerandproducer.dto.FakeProducerDTO
 
 # topic
-FAKE_PRODUCER_DTO_TOPIC=fake_producer_dto_topic
+FAKE_PRODUCER_DTO_TOPIC=fake_consumer_dto_topic
 FAKE_CONSUMER_DTO_TOPIC=fake_consumer_dto_topic
 ```
 
@@ -100,29 +102,18 @@ FAKE_CONSUMER_DTO_TOPIC=fake_consumer_dto_topic
 - [ReactiveProducerService](src/main/java/com/example/reactivekafkaconsumerandproducer/service/ReactiveProducerService.java)
 
 ```java
-package com.example.reactivekafkaconsumerandproducer.service;
-
-import com.example.reactivekafkaconsumerandproducer.dto.FakeConsumerDTO;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.kafka.core.reactive.ReactiveKafkaConsumerTemplate;
-import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-
 
 @Service
 public class ReactiveConsumerService implements CommandLineRunner {
     Logger log = LoggerFactory.getLogger(ReactiveConsumerService.class);
 
-    private final ReactiveKafkaConsumerTemplate<String, FakeConsumerDTO> reactiveKafkaConsumerTemplate;
+    private final ReactiveKafkaConsumerTemplate<String, FakeProducerDTO> reactiveKafkaConsumerTemplate;
 
-    public ReactiveConsumerService(ReactiveKafkaConsumerTemplate<String, FakeConsumerDTO> reactiveKafkaConsumerTemplate) {
+    public ReactiveConsumerService(ReactiveKafkaConsumerTemplate<String, FakeProducerDTO> reactiveKafkaConsumerTemplate) {
         this.reactiveKafkaConsumerTemplate = reactiveKafkaConsumerTemplate;
     }
 
-    private Flux<FakeConsumerDTO> consumeFakeConsumerDTO() {
+    private Flux<FakeProducerDTO> consumeFakeConsumerDTO() {
         return reactiveKafkaConsumerTemplate
                 .receiveAutoAck()
                 // .delayElements(Duration.ofSeconds(2L)) // BACKPRESSURE
@@ -133,7 +124,7 @@ public class ReactiveConsumerService implements CommandLineRunner {
                         consumerRecord.offset())
                 )
                 .map(ConsumerRecord::value)
-                .doOnNext(fakeConsumerDTO -> log.info("successfully consumed {}={}", FakeConsumerDTO.class.getSimpleName(), fakeConsumerDTO))
+                .doOnNext(fakeConsumerDTO -> log.info("successfully consumed {}={}", FakeProducerDTO.class.getSimpleName(), fakeConsumerDTO))
                 .doOnError(throwable -> log.error("something bad happened while consuming : {}", throwable.getMessage()));
     }
 
@@ -146,15 +137,6 @@ public class ReactiveConsumerService implements CommandLineRunner {
 ```
 
 ```java
-package com.example.reactivekafkaconsumerandproducer.service;
-
-import com.example.reactivekafkaconsumerandproducer.dto.FakeProducerDTO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.reactive.ReactiveKafkaProducerTemplate;
-import org.springframework.stereotype.Service;
-
 @Service
 public class ReactiveProducerService {
 
@@ -172,22 +154,11 @@ public class ReactiveProducerService {
         log.info("send to topic={}, {}={},", topic, FakeProducerDTO.class.getSimpleName(), fakeProducerDTO);
         reactiveKafkaProducerTemplate.send(topic, fakeProducerDTO)
                 .doOnSuccess(senderResult -> log.info("sent {} offset : {}", fakeProducerDTO, senderResult.recordMetadata().offset()))
-                .subscribe();
+                .doOnError(throwable -> log.info("sent {} offset : {}", fakeProducerDTO, throwable.getMessage()))
+                .subscribe(voidSenderResult -> log.info(voidSenderResult.recordMetadata().toString()));
     }
 }
 ```
-
-## Integration test
-- [ReactiveConsumerServiceIntegrationTest](src/test/java/com/example/reactivekafkaconsumerandproducer/ReactiveConsumerServiceIntegrationTest.java)
-- [ReactiveProducerServiceIntegrationTest](src/test/java/com/example/reactivekafkaconsumerandproducer/ReactiveProducerServiceIntegrationTest.java)
-
-
-```java
-```
-
-```java
-```
----
 
 # Articles
 
