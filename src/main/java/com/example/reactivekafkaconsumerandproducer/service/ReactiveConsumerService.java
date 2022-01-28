@@ -1,6 +1,7 @@
 package com.example.reactivekafkaconsumerandproducer.service;
 
 import com.example.reactivekafkaconsumerandproducer.dto.FakeConsumerDTO;
+import com.example.reactivekafkaconsumerandproducer.dto.FakeProducerDTO;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,13 +15,13 @@ import reactor.core.publisher.Flux;
 public class ReactiveConsumerService implements CommandLineRunner {
     Logger log = LoggerFactory.getLogger(ReactiveConsumerService.class);
 
-    private final ReactiveKafkaConsumerTemplate<String, FakeConsumerDTO> reactiveKafkaConsumerTemplate;
+    private final ReactiveKafkaConsumerTemplate<String, FakeProducerDTO> reactiveKafkaConsumerTemplate;
 
-    public ReactiveConsumerService(ReactiveKafkaConsumerTemplate<String, FakeConsumerDTO> reactiveKafkaConsumerTemplate) {
+    public ReactiveConsumerService(ReactiveKafkaConsumerTemplate<String, FakeProducerDTO> reactiveKafkaConsumerTemplate) {
         this.reactiveKafkaConsumerTemplate = reactiveKafkaConsumerTemplate;
     }
 
-    private Flux<FakeConsumerDTO> consumeFakeConsumerDTO() {
+    private Flux<FakeProducerDTO> consumeFakeConsumerDTO() {
         return reactiveKafkaConsumerTemplate
                 .receiveAutoAck()
                 // .delayElements(Duration.ofSeconds(2L)) // BACKPRESSURE
@@ -31,7 +32,7 @@ public class ReactiveConsumerService implements CommandLineRunner {
                         consumerRecord.offset())
                 )
                 .map(ConsumerRecord::value)
-                .doOnNext(fakeConsumerDTO -> log.info("successfully consumed {}={}", FakeConsumerDTO.class.getSimpleName(), fakeConsumerDTO))
+                .doOnNext(fakeConsumerDTO -> log.info("successfully consumed {}={}", FakeProducerDTO.class.getSimpleName(), fakeConsumerDTO))
                 .doOnError(throwable -> log.error("something bad happened while consuming : {}", throwable.getMessage()));
     }
 
