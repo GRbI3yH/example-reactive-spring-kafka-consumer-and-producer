@@ -42,7 +42,7 @@ public class ReactiveKafkaConsumerConfig {
 ```java
 package com.example.reactivekafkaconsumerandproducer.config;
 
-import com.example.reactivekafkaconsumerandproducer.dto.FakeProducerDTO;
+import com.example.reactivekafkaconsumerandproducer.dto.MessageFromKafka;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,10 +54,10 @@ import java.util.Map;
 @Configuration
 public class ReactiveKafkaProducerConfig {
     @Bean
-    public ReactiveKafkaProducerTemplate<String, FakeProducerDTO> reactiveKafkaProducerTemplate(
+    public ReactiveKafkaProducerTemplate<String, MessageFromKafka> reactiveKafkaProducerTemplate(
             KafkaProperties properties) {
         Map<String, Object> props = properties.buildProducerProperties();
-        return new ReactiveKafkaProducerTemplate<String, FakeProducerDTO>(SenderOptions.create(props));
+        return new ReactiveKafkaProducerTemplate<String, MessageFromKafka>(SenderOptions.create(props));
     }
 }
 ```
@@ -70,7 +70,6 @@ spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.Strin
 spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer
 # consumer
 spring.kafka.consumer.group-id=reactivekafkaconsumerandproducer
-
 spring.kafka.consumer.auto-offset-reset=earliest
 spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
 spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
@@ -78,8 +77,7 @@ spring.kafka.consumer.properties.spring.json.trusted.packages=*
 # json deserializer config
 spring.kafka.properties.spring.json.trusted.packages=*
 spring.kafka.consumer.properties.spring.json.use.type.headers=false
-spring.kafka.consumer.properties.spring.json.value.default.type=com.example.reactivekafkaconsumerandproducer.dto.FakeProducerDTO
-
+spring.kafka.consumer.properties.spring.json.value.default.type=com.example.reactivekafkaconsumerandproducer.dto.MessageFromKafka
 # topic
 FAKE_PRODUCER_DTO_TOPIC=fake_consumer_dto_topic
 FAKE_CONSUMER_DTO_TOPIC=fake_consumer_dto_topic
@@ -150,11 +148,11 @@ public class ReactiveProducerService {
         this.reactiveKafkaProducerTemplate = reactiveKafkaProducerTemplate;
     }
 
-    public void send(FakeProducerDTO fakeProducerDTO) {
-        log.info("send to topic={}, {}={},", topic, FakeProducerDTO.class.getSimpleName(), fakeProducerDTO);
-        reactiveKafkaProducerTemplate.send(topic, fakeProducerDTO)
-                .doOnSuccess(senderResult -> log.info("sent {} offset : {}", fakeProducerDTO, senderResult.recordMetadata().offset()))
-                .doOnError(throwable -> log.info("sent {} offset : {}", fakeProducerDTO, throwable.getMessage()))
+    public void send(FakeProducerDTO messageFromKafka) {
+        log.info("send to topic={}, {}={},", topic, FakeProducerDTO.class.getSimpleName(), messageFromKafka);
+        reactiveKafkaProducerTemplate.send(topic, messageFromKafka)
+                .doOnSuccess(senderResult -> log.info("sent {} offset : {}", messageFromKafka, senderResult.recordMetadata().offset()))
+                .doOnError(throwable -> log.info("sent {} offset : {}", messageFromKafka, throwable.getMessage()))
                 .subscribe(voidSenderResult -> log.info(voidSenderResult.recordMetadata().toString()));
     }
 }

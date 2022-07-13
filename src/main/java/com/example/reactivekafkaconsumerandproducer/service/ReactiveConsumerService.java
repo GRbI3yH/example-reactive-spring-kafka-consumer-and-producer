@@ -1,7 +1,6 @@
 package com.example.reactivekafkaconsumerandproducer.service;
 
-import com.example.reactivekafkaconsumerandproducer.dto.FakeConsumerDTO;
-import com.example.reactivekafkaconsumerandproducer.dto.FakeProducerDTO;
+import com.example.reactivekafkaconsumerandproducer.dto.MessageFromKafka;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,13 +14,20 @@ import reactor.core.publisher.Flux;
 public class ReactiveConsumerService implements CommandLineRunner {
     Logger log = LoggerFactory.getLogger(ReactiveConsumerService.class);
 
-    private final ReactiveKafkaConsumerTemplate<String, FakeProducerDTO> reactiveKafkaConsumerTemplate;
+    private final ReactiveKafkaConsumerTemplate<String, MessageFromKafka> reactiveKafkaConsumerTemplate;
 
-    public ReactiveConsumerService(ReactiveKafkaConsumerTemplate<String, FakeProducerDTO> reactiveKafkaConsumerTemplate) {
+    public ReactiveConsumerService(ReactiveKafkaConsumerTemplate<String, MessageFromKafka> reactiveKafkaConsumerTemplate) {
         this.reactiveKafkaConsumerTemplate = reactiveKafkaConsumerTemplate;
     }
 
-    private Flux<FakeProducerDTO> consumeFakeConsumerDTO() {
+    class Result{
+        public int s = 0;
+        public int e = 0;
+    }
+
+    private Result result = new Result();
+
+    private Flux<MessageFromKafka> consumeFakeConsumerDTO() {
         return reactiveKafkaConsumerTemplate
                 .receiveAutoAck()
                 // .delayElements(Duration.ofSeconds(2L)) // BACKPRESSURE
@@ -32,8 +38,16 @@ public class ReactiveConsumerService implements CommandLineRunner {
                         consumerRecord.offset())
                 )
                 .map(ConsumerRecord::value)
-                .doOnNext(fakeConsumerDTO -> log.info("successfully consumed {}={}", FakeProducerDTO.class.getSimpleName(), fakeConsumerDTO))
-                .doOnError(throwable -> log.error("something bad happened while consuming : {}", throwable.getMessage()));
+                .doOnNext(fakeConsumerDTO -> {
+                    result.s++;
+                    log.info("successfully consumed {}={}", MessageFromKafka.class.getSimpleName(), fakeConsumerDTO);
+                    log.info("s:{} e:{}",result.s, result.e);
+                })
+                .doOnError(throwable -> {
+                    result.e++;
+                    log.error("something bad happened while consuming : {}", throwable.getMessage());
+                    log.info("s:{} e:{}",result.s, result.e);
+                });
     }
 
     @Override
